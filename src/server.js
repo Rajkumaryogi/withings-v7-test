@@ -28,6 +28,13 @@ function resolveWithingsWebhookUrl() {
     return '';
 }
 
+/** OAuth redirect_uri must match Withings app settings; override per env (e.g. Render) without invalid JSON in config.json. */
+function getWithingsRedirectUri() {
+    const fromEnv = (process.env.WITHINGS_REDIRECT_URI || '').trim();
+    if (fromEnv) return fromEnv;
+    return String(config.redirect_uri || '').trim();
+}
+
 function buildSuccessHtml() {
   return `<!DOCTYPE html>
 <html>
@@ -130,7 +137,7 @@ app.get('/login', (req, res) => {
         authUrl.searchParams.set('response_type', 'code');
         authUrl.searchParams.set('client_id', config.client_id);
         authUrl.searchParams.set('scope', config.scopes);
-        authUrl.searchParams.set('redirect_uri', config.redirect_uri);
+        authUrl.searchParams.set('redirect_uri', getWithingsRedirectUri());
         authUrl.searchParams.set('state', state);
         res.redirect(authUrl.toString());
     } catch (error) {
@@ -162,7 +169,7 @@ app.get('/api/withings/auth/initiate', (req, res) => {
         authUrl.searchParams.append('response_type', 'code');
         authUrl.searchParams.append('client_id', config.client_id);
         authUrl.searchParams.append('scope', config.scopes);
-        authUrl.searchParams.append('redirect_uri', config.redirect_uri);
+        authUrl.searchParams.append('redirect_uri', getWithingsRedirectUri());
         authUrl.searchParams.append('state', config.state);
         
         res.json({
@@ -433,7 +440,7 @@ app.get('/callback', async (req, res) => {
         const params = {
             action: 'requesttoken',
             client_id: config.client_id,
-            redirect_uri: config.redirect_uri,
+            redirect_uri: getWithingsRedirectUri(),
             code: code,
             grant_type: 'authorization_code',
             nonce: nonce

@@ -1,0 +1,9 @@
+{
+  "client_id": "fff9cb92eb26c78fcb77f43c51ab58a7478fd033885cc27e7e1f70d29f4acc5d",
+  "client_secret": "d0b0239ea3ce7ff70ee89e46519de393aefd298020397dc9aa41ee4f008e6669",
+  "redirect_uri": "http://localhost:5001/callback",
+  "api_endpoint": "https://wbsapi.withings.net",
+  "scopes": "user.info,user.metrics,user.activity,user.sleepevents",
+  "state": "withings_auth_state_12345",
+  "auth_url": "https://account.withings.com/oauth2_user/authorize2"
+}

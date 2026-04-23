@@ -4,7 +4,6 @@ package-lock.json
 withings.json
 data/*.json
 
-config.json
 
 dist/
 .env
