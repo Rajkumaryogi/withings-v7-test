@@ -1,0 +1,33 @@
+{
+  "name": "withings_app",
+  "version": "1.0.0",
+  "description": "Withings API Integration",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/index.js",
+    "auth": "node src/auth.js",
+    "get-data": "node src/data/save-data.js",
+    "status": "node src/index.js status",
+    "server": "node src/server.js",
+    "docs": "node src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.100.0",
+    "@aws-sdk/lib-dynamodb": "^3.100.0",
+    "axios": "^1.13.2",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "nodemon": "^3.1.14",
+    "open": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
