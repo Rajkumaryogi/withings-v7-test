@@ -893,8 +893,15 @@ function getDocumentationHTML() {
                 </div>
                 
                 <h3>Push notifications (continuous sync)</h3>
-                <p>Set <code>WITHINGS_WEBHOOK_URL</code> to your <strong>public HTTPS</strong> URL for this route (example: <code>https://your-domain.com/webhook/withings</code>). Add the same URL in the Withings Developer Portal notification callback allowlist.</p>
-                <p>After each successful OAuth, the server subscribes to Withings data categories (weight, activity, sleep, …). New readings in Withings cloud trigger <code>POST /webhook/withings</code>, which runs the same sync as <code>POST /api/withings/sync</code> and writes to <code>user_vitals</code>.</p>
+                <p>Set <code>WITHINGS_WEBHOOK_URL</code> to your <strong>public HTTPS</strong> URL. Withings only <code>POST</code>s after <strong>successful subscribe</strong> (JSON <code>status: 0</code> per category); until then your webhook receives nothing.</p>
+                <ul style="margin:12px 0 12px 20px;color:#555">
+                    <li><strong>Path:</strong> this server exposes <code>/webhook/withings</code> (not <code>/withings/webhook</code>).</li>
+                    <li><strong>Developer Portal:</strong> allowlist the <em>exact</em> callback URL (same string as <code>WITHINGS_WEBHOOK_URL</code>), HTTPS.</li>
+                    <li><strong>Subscribe API URL:</strong> default is <code>https://wbsapi.withings.net/notify</code>. Do <strong>not</strong> set <code>WITHINGS_NOTIFY_USE_V2=1</code> on Render unless Withings requires it; <code>/v2/notify</code> often returns <code>Insufficient_scope</code> for Public API.</li>
+                    <li><strong>How to subscribe:</strong> complete OAuth again (auto-subscribe after callback), or call <code>POST /api/withings/register-webhooks</code> with <code>cognitoUserId</code> (see example below). Confirm logs: <code>Withings notify subscribed appli=…</code>.</li>
+                    <li><strong>Realtime gateway:</strong> optional — set <code>VITALS_REALTIME_GATEWAY_URL</code> and <code>VITALS_REALTIME_GATEWAY_SECRET</code> or ignore the gateway publish warning; it does not affect Withings webhooks or DynamoDB sync.</li>
+                </ul>
+                <p>After each successful OAuth, the server subscribes to Withings data categories (weight, activity, sleep, …). New cloud data triggers <code>POST /webhook/withings</code>, which runs the same sync as <code>POST /api/withings/sync</code> and writes to <code>user_vitals</code>.</p>
                 <div class="endpoint">
                     <span class="method get">GET</span>
                     <span class="method head">HEAD</span>
@@ -919,6 +926,14 @@ function getDocumentationHTML() {
                 <h3>Check Authentication Status</h3>
                 <div class="code-block">
 <pre>curl http://localhost:5001/api/status</pre>
+                </div>
+                
+                <h3>Re-register Withings push subscriptions</h3>
+                <p>After fixing env (e.g. unset <code>WITHINGS_NOTIFY_USE_V2</code>), call with the Vitals7 user id (Cognito sub):</p>
+                <div class="code-block">
+<pre>curl -sS -X POST "http://localhost:5001/api/withings/register-webhooks" \\
+  -H "Content-Type: application/json" \\
+  -d '{"cognitoUserId":"YOUR_COGNITO_SUB_UUID"}'</pre>
                 </div>
                 
                 <h3>View Documentation</h3>
@@ -1039,7 +1054,13 @@ app.get('/', (req, res) => {
         } else {
             console.log(`🔔 Withings webhook URL: ${hookBanner}`);
         }
-        console.log(`📮 Withings notify API (subscribe POST): ${getNotifyApiUrl()}`);
+        const notifyUrl = getNotifyApiUrl();
+        console.log(`📮 Withings notify API (subscribe POST): ${notifyUrl}`);
+        if (/\/v2\/notify$/i.test(String(notifyUrl).replace(/\/$/, ''))) {
+            console.warn(
+                '⚠️  Notify subscribe uses /v2/notify — Public API tokens often get Insufficient_scope (403). Unset WITHINGS_NOTIFY_USE_V2 on Render unless Withings requires v2; default is https://wbsapi.withings.net/notify'
+            );
+        }
         console.log(`\nPress Ctrl+C to stop the server\n`);
     });
 
