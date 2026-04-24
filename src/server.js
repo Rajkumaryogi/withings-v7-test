@@ -15,7 +15,7 @@ const {
     runWithingsSyncForUser,
     transformWithingsData,
 } = require('./withings-sync-service');
-const { subscribeAllForAccessToken } = require('./withings-notify');
+const { subscribeAllForAccessToken, getNotifyApiUrl } = require('./withings-notify');
 
 /** Public URL Withings will POST to (must match Developer Portal callback allowlist). */
 function resolveWithingsWebhookUrl() {
@@ -306,6 +306,12 @@ async function handleWithingsWebhookPost(req, res) {
             } else {
                 console.warn('Withings webhook: no DynamoDB row for Withings userid=%s', userid);
             }
+        } else {
+            const keys = Object.keys({ ...(req.query || {}), ...(req.body || {}) });
+            console.warn(
+                'Withings webhook: POST with no userid (Withings only calls here after a successful subscribe; keys=%s)',
+                keys.length ? keys.join(',') : 'none'
+            );
         }
     } catch (e) {
         console.error('Withings webhook:', e);
@@ -1033,6 +1039,7 @@ app.get('/', (req, res) => {
         } else {
             console.log(`🔔 Withings webhook URL: ${hookBanner}`);
         }
+        console.log(`📮 Withings notify API (subscribe POST): ${getNotifyApiUrl()}`);
         console.log(`\nPress Ctrl+C to stop the server\n`);
     });
 

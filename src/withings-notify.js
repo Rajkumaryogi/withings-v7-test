@@ -7,14 +7,36 @@ const config = require('../config.json');
 
 const DEFAULT_APLIS = [1, 2, 4, 16, 44, 50, 51];
 
-/** OAuth2 notify subscribe must POST to /v2/notify; root URL returns status 2554 "Not implemented". */
+/**
+ * OAuth2 notify subscribe must POST to …/v2/notify.
+ * POSTing to https://wbsapi.withings.net/ (no path) returns status 2554 "Not implemented".
+ * Many envs set WITHINGS_NOTIFY_API_URL to the bare host from old docs — normalize that here.
+ */
 function getNotifyApiUrl() {
-  const fromEnv = process.env.WITHINGS_NOTIFY_API_URL;
-  if (fromEnv && String(fromEnv).trim()) {
-    return String(fromEnv).trim().replace(/\/$/, '');
-  }
   const base = String(config.api_endpoint || 'https://wbsapi.withings.net').replace(/\/$/, '');
-  return `${base}/v2/notify`;
+  const defaultUrl = `${base}/v2/notify`;
+
+  const raw = process.env.WITHINGS_NOTIFY_API_URL;
+  if (!raw || !String(raw).trim()) return defaultUrl;
+
+  let trimmed = String(raw).trim().replace(/\/$/, '');
+  if (/\/v2\/notify$/i.test(trimmed)) return trimmed;
+
+  try {
+    const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const u = new URL(href);
+    if (u.hostname.toLowerCase() === 'wbsapi.withings.net' && (!u.pathname || u.pathname === '/')) {
+      console.warn(
+        'Withings notify: WITHINGS_NOTIFY_API_URL is the bare wbsapi host; using %s (subscribe is not implemented on /).',
+        defaultUrl
+      );
+      return defaultUrl;
+    }
+  } catch (_) {
+    /* keep trimmed */
+  }
+
+  return trimmed;
 }
 
 function parseAppliList() {
@@ -72,10 +94,13 @@ async function subscribeAllForAccessToken(accessToken, callbackUrl) {
       const ok = data && Number(data.status) === 0;
       results.push({ appli, ok, status: data?.status, body: data?.body });
       if (!ok) {
+        const detail =
+          data && typeof data === 'object'
+            ? JSON.stringify(data).slice(0, 500)
+            : String(data);
         console.warn(
-          `Withings notify subscribe appli=${appli} non-zero status:`,
-          data?.status,
-          data?.error || data?.body
+          `Withings notify subscribe appli=${appli} non-zero status (POST ${getNotifyApiUrl()}):`,
+          detail
         );
       } else {
         console.log(`Withings notify subscribed appli=${appli}`);
@@ -92,6 +117,7 @@ async function subscribeAllForAccessToken(accessToken, callbackUrl) {
 module.exports = {
   subscribe,
   subscribeAllForAccessToken,
+  getNotifyApiUrl,
   parseAppliList,
   DEFAULT_APLIS,
 };
