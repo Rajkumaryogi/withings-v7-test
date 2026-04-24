@@ -164,24 +164,41 @@ class WithingsAPI {
         return response.data;
     }
 
-    // User profile — getbyuserid is not implemented on v2/user (returns 2554); getprofile is the OAuth2 action.
+    // User profile: try getprofile; on failure use Withings userid from the OAuth token (getprofile can return 403 Insufficient_scope for some apps).
     async getUserInfo() {
         const data = await this.makeRequest('getprofile');
-        if (!data || Number(data.status) !== 0) {
-            return data;
+        if (data && Number(data.status) === 0) {
+            const b = data.body || {};
+            const prof = b.user;
+            if (prof && typeof prof === 'object') {
+                return {
+                    status: data.status,
+                    body: {
+                        ...b,
+                        user: { user: prof },
+                    },
+                };
+            }
         }
-        const b = data.body || {};
-        const prof = b.user;
-        if (!prof || typeof prof !== 'object') {
-            return data;
+
+        const tokens = tokenManager.getTokens();
+        const wid = tokens?.userid;
+        if (wid != null && String(wid).trim() !== '') {
+            const idNum = Number(wid);
+            const id = Number.isFinite(idNum) ? idNum : wid;
+            console.warn(
+                'Withings getprofile unavailable (status %s); using userid from token for user block.',
+                data?.status != null ? data.status : 'n/a'
+            );
+            return {
+                status: 0,
+                body: {
+                    user: { user: { id } },
+                },
+            };
         }
-        return {
-            status: data.status,
-            body: {
-                ...b,
-                user: { user: prof },
-            },
-        };
+
+        return data;
     }
 
     // Device Information

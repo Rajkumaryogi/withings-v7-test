@@ -8,29 +8,45 @@ const config = require('../config.json');
 const DEFAULT_APLIS = [1, 2, 4, 16, 44, 50, 51];
 
 /**
- * OAuth2 notify subscribe must POST to …/v2/notify.
- * POSTing to https://wbsapi.withings.net/ (no path) returns status 2554 "Not implemented".
- * Many envs set WITHINGS_NOTIFY_API_URL to the bare host from old docs — normalize that here.
+ * Notify subscribe uses …/notify (legacy path). Withings’ own client uses path `notify`, and the
+ * OAuth scope table ties Notify–Subscribe to user.info / user.metrics / user.activity for that service.
+ * POSTing to https://wbsapi.withings.net/ (no path) → 2554 Not implemented.
+ * POSTing to …/v2/notify often returns Insufficient_scope for normal Public API tokens.
+ * Set WITHINGS_NOTIFY_USE_V2=1 to force …/v2/notify if your program requires it.
  */
 function getNotifyApiUrl() {
   const base = String(config.api_endpoint || 'https://wbsapi.withings.net').replace(/\/$/, '');
-  const defaultUrl = `${base}/v2/notify`;
+  const legacyNotify = `${base}/notify`;
+  const v2Notify = `${base}/v2/notify`;
+
+  if (String(process.env.WITHINGS_NOTIFY_USE_V2 || '').trim() === '1') {
+    return v2Notify;
+  }
 
   const raw = process.env.WITHINGS_NOTIFY_API_URL;
-  if (!raw || !String(raw).trim()) return defaultUrl;
+  if (!raw || !String(raw).trim()) return legacyNotify;
 
   let trimmed = String(raw).trim().replace(/\/$/, '');
-  if (/\/v2\/notify$/i.test(trimmed)) return trimmed;
+
+  if (/\/v2\/notify$/i.test(trimmed)) {
+    console.warn(
+      'Withings notify: WITHINGS_NOTIFY_API_URL ends with /v2/notify; using %s (v2 often returns Insufficient_scope). Set WITHINGS_NOTIFY_USE_V2=1 to keep v2.',
+      legacyNotify
+    );
+    return legacyNotify;
+  }
+
+  if (trimmed.endsWith('/notify')) return trimmed;
 
   try {
     const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
     const u = new URL(href);
     if (u.hostname.toLowerCase() === 'wbsapi.withings.net' && (!u.pathname || u.pathname === '/')) {
       console.warn(
-        'Withings notify: WITHINGS_NOTIFY_API_URL is the bare wbsapi host; using %s (subscribe is not implemented on /).',
-        defaultUrl
+        'Withings notify: WITHINGS_NOTIFY_API_URL is the bare wbsapi host; using %s.',
+        legacyNotify
       );
-      return defaultUrl;
+      return legacyNotify;
     }
   } catch (_) {
     /* keep trimmed */
@@ -49,7 +65,7 @@ function parseAppliList() {
 }
 
 /**
- * POST …/v2/notify with form body (Bearer token; same style as measure/user v2).
+ * POST …/notify with form body (Bearer token).
  */
 async function notifyRequest(accessToken, formParams) {
   const body = new URLSearchParams(formParams).toString();
