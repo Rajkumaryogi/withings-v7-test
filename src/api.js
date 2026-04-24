@@ -164,9 +164,24 @@ class WithingsAPI {
         return response.data;
     }
 
-    // User Information
+    // User profile — getbyuserid is not implemented on v2/user (returns 2554); getprofile is the OAuth2 action.
     async getUserInfo() {
-        return this.makeRequest('getbyuserid');
+        const data = await this.makeRequest('getprofile');
+        if (!data || Number(data.status) !== 0) {
+            return data;
+        }
+        const b = data.body || {};
+        const prof = b.user;
+        if (!prof || typeof prof !== 'object') {
+            return data;
+        }
+        return {
+            status: data.status,
+            body: {
+                ...b,
+                user: { user: prof },
+            },
+        };
     }
 
     // Device Information

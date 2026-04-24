@@ -7,6 +7,16 @@ const config = require('../config.json');
 
 const DEFAULT_APLIS = [1, 2, 4, 16, 44, 50, 51];
 
+/** OAuth2 notify subscribe must POST to /v2/notify; root URL returns status 2554 "Not implemented". */
+function getNotifyApiUrl() {
+  const fromEnv = process.env.WITHINGS_NOTIFY_API_URL;
+  if (fromEnv && String(fromEnv).trim()) {
+    return String(fromEnv).trim().replace(/\/$/, '');
+  }
+  const base = String(config.api_endpoint || 'https://wbsapi.withings.net').replace(/\/$/, '');
+  return `${base}/v2/notify`;
+}
+
 function parseAppliList() {
   const raw = process.env.WITHINGS_NOTIFY_APPLIS;
   if (!raw || !String(raw).trim()) return DEFAULT_APLIS;
@@ -17,11 +27,11 @@ function parseAppliList() {
 }
 
 /**
- * POST root wbsapi.withings.net with form body (same pattern as OAuth).
+ * POST …/v2/notify with form body (Bearer token; same style as measure/user v2).
  */
 async function notifyRequest(accessToken, formParams) {
   const body = new URLSearchParams(formParams).toString();
-  const baseUrl = process.env.WITHINGS_NOTIFY_API_URL || config.api_endpoint;
+  const baseUrl = getNotifyApiUrl();
   const res = await axios.post(baseUrl, body, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -62,7 +72,11 @@ async function subscribeAllForAccessToken(accessToken, callbackUrl) {
       const ok = data && Number(data.status) === 0;
       results.push({ appli, ok, status: data?.status, body: data?.body });
       if (!ok) {
-        console.warn(`Withings notify subscribe appli=${appli} non-zero status:`, data?.status, data?.body);
+        console.warn(
+          `Withings notify subscribe appli=${appli} non-zero status:`,
+          data?.status,
+          data?.error || data?.body
+        );
       } else {
         console.log(`Withings notify subscribed appli=${appli}`);
       }
